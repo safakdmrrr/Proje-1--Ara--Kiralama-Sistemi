@@ -1,0 +1,365 @@
+import sys
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox, QTabWidget, QFrame
+from PyQt5.QtGui import QColor, QPalette
+from PyQt5.QtCore import Qt
+
+registered_users = {
+    "user1": "password1",
+    "user2": "password2",
+    "user3": "password3"
+}
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Ana Pencere")
+        self.setGeometry(0, 0, 600, 400)
+        self.center_on_screen()
+        self.setFixedSize(600, 400)
+
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+
+        self.tab_widget = QTabWidget()
+        self.central_layout = QVBoxLayout(self.central_widget)
+        self.central_layout.addWidget(self.tab_widget)
+
+        self.create_tabs()
+
+        # Araç verilerini saklamak için sözlük oluşturdum
+        self.vehicle_data = {
+            "10001": {"model": "Megane", "status": "Kiralanabilir"}
+        }
+
+    def center_on_screen(self):
+        qr = self.frameGeometry()
+        cp = QApplication.desktop().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
+
+    def create_tabs(self):
+        self.create_vehicle_tab()
+        self.create_rental_tab()
+
+    def create_vehicle_tab(self):
+        vehicle_tab = QWidget()
+        layout = QVBoxLayout(vehicle_tab)
+
+        # Arama Metin Giriş Alanı
+        self.search_input = QLineEdit(vehicle_tab)
+        self.search_input.setPlaceholderText("Araç modelini veya ID'sini yazın...")
+        layout.addWidget(self.search_input)
+
+        # İlk Buton: Araç Bilgileri Öğren
+        self.info_button = QPushButton("Araç Bilgileri Öğren", vehicle_tab)
+        self.info_button.setStyleSheet("width: 200px; height: 50px;")
+        layout.addWidget(self.info_button, alignment=Qt.AlignCenter)
+
+        # İkinci Buton: Durumu Güncelle
+        self.update_status_button = QPushButton("Durumu Güncelle", vehicle_tab)
+        self.update_status_button.setStyleSheet("width: 200px; height: 50px;")
+        layout.addWidget(self.update_status_button, alignment=Qt.AlignCenter)
+
+        # Bilgi Gösterme Alanı
+        self.vehicle_info_frame = QFrame(vehicle_tab)
+        self.vehicle_info_frame.setStyleSheet("background-color: green;")
+        self.vehicle_info_frame.setFrameShape(QFrame.StyledPanel)
+        self.vehicle_info_frame.setFixedHeight(100)  # Yüksekliği 100 piksel olarak ayarla
+        self.vehicle_info_frame.hide()  # Başlangıçta gizli olarak ayarla
+        layout.addWidget(self.vehicle_info_frame)
+
+        self.vehicle_info_label = QLabel(self.vehicle_info_frame)
+        self.vehicle_info_label.setAlignment(Qt.AlignCenter)
+        self.vehicle_info_label.setStyleSheet("color: white;")
+        self.vehicle_info_frame_layout = QVBoxLayout(self.vehicle_info_frame)
+        self.vehicle_info_frame_layout.addWidget(self.vehicle_info_label)
+
+        # Düğmeler arasındaki boşluğu ayarla
+        layout.setSpacing(10)  # Düğmeler arasındaki boşluğu 10 piksel olarak ayarla
+
+        self.tab_widget.addTab(vehicle_tab, "Araç İşlemleri")
+
+        # Arama metni değişikliği için sinyal-slot bağlantısı
+        self.info_button.clicked.connect(self.show_vehicle_info)
+        self.update_status_button.clicked.connect(self.update_vehicle_status)
+
+    def create_rental_tab(self):
+        rental_tab = QWidget()
+        layout = QVBoxLayout(rental_tab)
+
+        # Arama Metin Giriş Alanı (Araç İşlemleri sekmesindeki gibi)
+        self.rental_search_input = QLineEdit(rental_tab)
+        self.rental_search_input.setPlaceholderText("Araç ID'sini yazın...")
+        layout.addWidget(self.rental_search_input)
+
+        # İlk Buton: Kiralama Yap
+        self.rent_button = QPushButton("Kiralama Yap", rental_tab)
+        self.rent_button.setStyleSheet("width: 200px; height: 50px;")
+        layout.addWidget(self.rent_button, alignment=Qt.AlignCenter)
+
+        # İkinci Buton: Kiralamayı İptal Et
+        self.end_rent_button = QPushButton("Kiralamayı İptal Et", rental_tab)
+        self.end_rent_button.setStyleSheet("width: 200px; height: 50px;")
+        layout.addWidget(self.end_rent_button, alignment=Qt.AlignCenter)
+
+        # Kiralama Bilgi Gösterme Alanı
+        self.rental_info_frame = QFrame(rental_tab)
+        self.rental_info_frame.setStyleSheet("background-color: green;")
+        self.rental_info_frame.setFrameShape(QFrame.StyledPanel)
+        self.rental_info_frame.setFixedHeight(100)  # Yüksekliği 100 piksel olarak ayarla
+        self.rental_info_frame.hide()  # Başlangıçta gizli olarak ayarla
+        layout.addWidget(self.rental_info_frame)
+
+        self.rental_info_label = QLabel(self.rental_info_frame)
+        self.rental_info_label.setAlignment(Qt.AlignCenter)
+        self.rental_info_label.setStyleSheet("color: white;")
+        self.rental_info_frame_layout = QVBoxLayout(self.rental_info_frame)
+        self.rental_info_frame_layout.addWidget(self.rental_info_label)
+
+        # Düğmeler arasındaki boşluğu ayarla
+        layout.setSpacing(10)  # Düğmeler arasındaki boşluğu 10 piksel olarak ayarla
+
+        self.tab_widget.addTab(rental_tab, "Kiralama İşlemleri")
+
+        # Kiralama metni değişikliği için sinyal-slot bağlantısı
+        self.rent_button.clicked.connect(self.make_rental)
+        self.end_rent_button.clicked.connect(self.end_rental)
+
+    def show_vehicle_info(self):
+        model_or_id = self.search_input.text().strip()
+        found_vehicle = None
+        if model_or_id in self.vehicle_data:  # Arama metni doğrudan ID ise
+            found_vehicle = self.vehicle_data[model_or_id]
+
+        if not found_vehicle:  # ID olarak bulunamadıysa model olarak ara
+            for vehicle_id, vehicle_info in self.vehicle_data.items():
+                if vehicle_info["model"].lower() == model_or_id.lower():
+                    found_vehicle = vehicle_info
+                    break
+
+        if found_vehicle:
+            info_text = f"ID: {vehicle_id}\nModel: {found_vehicle['model']}\nKira Durumu: {found_vehicle['status']}"
+            self.vehicle_info_label.setText(info_text)
+            self.vehicle_info_frame.show()  # Bilgi kutusunu görünür yap
+        else:
+            QMessageBox.warning(self, "Hata", "Araç bulunamadı.")
+            self.vehicle_info_frame.hide()  # Bilgi kutusunu gizle
+
+    def update_vehicle_status(self):
+        model_or_id = self.search_input.text().strip()
+        found_vehicle = None
+        if model_or_id in self.vehicle_data:  # Arama metni doğrudan ID ise
+            found_vehicle = self.vehicle_data[model_or_id]
+
+        if not found_vehicle:  # ID olarak bulunamadıysa model olarak ara
+            for vehicle_id, vehicle_info in self.vehicle_data.items():
+                if vehicle_info["model"].lower() == model_or_id.lower():
+                    found_vehicle = vehicle_info
+                    break
+
+        if found_vehicle:
+            current_status = found_vehicle["status"]
+            new_status = "Kiralanamaz" if current_status == "Kiralanabilir" else "Kiralanabilir"
+            found_vehicle["status"] = new_status
+            QMessageBox.information(self, "Durum Güncellendi", f"{found_vehicle['model']} aracının kira durumu güncellendi: {new_status}")
+        else:
+            QMessageBox.warning(self, "Hata", "Araç bulunamadı.")
+
+    def make_rental(self):
+        model_or_id = self.rental_search_input.text().strip()
+        found_vehicle = None
+        if model_or_id in self.vehicle_data:  # Arama metni doğrudan ID ise
+            found_vehicle = self.vehicle_data[model_or_id]
+
+        if not found_vehicle:  # ID olarak bulunamadıysa model olarak ara
+            for vehicle_id, vehicle_info in self.vehicle_data.items():
+                if vehicle_info["model"].lower() == model_or_id.lower():
+                    found_vehicle = vehicle_info
+                    break
+
+        if found_vehicle:
+            if found_vehicle["status"] == "Kiralanabilir":
+                found_vehicle["status"] = "Kiralanamaz"
+                QMessageBox.information(self, "Kiralama Başarılı", f"Araç (ID: {vehicle_id}) kiralandı.")
+            else:
+                QMessageBox.warning(self, "Hata", f"Araç (ID: {vehicle_id}) zaten kiralanmış durumda.")
+        else:
+            QMessageBox.warning(self, "Hata", f"Araç (ID: {vehicle_id}) sistemde kayıtlı değil.")
+
+    def end_rental(self):
+        model_or_id = self.rental_search_input.text().strip()
+        found_vehicle = None
+        if model_or_id in self.vehicle_data:  # Arama metni doğrudan ID ise
+            found_vehicle = self.vehicle_data[model_or_id]
+
+        if not found_vehicle:  # ID olarak bulunamadıysa model olarak ara
+            for vehicle_id, vehicle_info in self.vehicle_data.items():
+                if vehicle_info["model"].lower() == model_or_id.lower():
+                    found_vehicle = vehicle_info
+                    break
+
+        if found_vehicle:
+            if found_vehicle["status"] == "Kiralanamaz":
+                found_vehicle["status"] = "Kiralanabilir"
+                QMessageBox.information(self, "Kiralama İptal Edildi", f"Araç (ID: {vehicle_id}) kiralama süresi sonlandırıldı.")
+            else:
+                QMessageBox.warning(self, "Hata", f"Araç (ID: {vehicle_id}) zaten kiralanabilir durumda.")
+        else:
+            QMessageBox.warning(self, "Hata", f"Araç (ID: {vehicle_id}) sistemde kayıtlı değil.")
+
+class LoginWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Kullanıcı Girişi")
+        self.setGeometry(0, 0, 400, 320)
+        self.center_on_screen()
+        self.setFixedSize(400, 320)
+
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        layout = QVBoxLayout(central_widget)
+
+        self.username_input = QLineEdit()
+        self.username_input.setPlaceholderText("Kullanıcı Adı")
+        self.username_input.setStyleSheet("color: white; background-color: #333333;")
+        layout.addWidget(self.username_input)
+
+        self.password_input = QLineEdit()
+        self.password_input.setPlaceholderText("Şifre")
+        self.password_input.setEchoMode(QLineEdit.Password)
+        self.password_input.setStyleSheet("color: white; background-color: #333333;")
+        layout.addWidget(self.password_input)
+
+        login_button = QPushButton("Giriş Yap")
+        login_button.setStyleSheet("background-color: #CCCCCC; color: black;")
+        login_button.clicked.connect(self.login)
+        layout.addWidget(login_button)
+
+        register_button = QPushButton("Kayıt Ol")
+        register_button.setStyleSheet("background-color: #CCCCCC; color: black;")
+        register_button.clicked.connect(self.open_register_window)
+        layout.addWidget(register_button)
+
+        # Arka plan rengini koyu gri yap
+        palette = QPalette()
+        palette.setColor(QPalette.Window, QColor(51, 51, 51))
+        self.setPalette(palette)
+
+    def login(self):
+        username = self.username_input.text().strip()
+        password = self.password_input.text().strip()
+
+        if not username or not password:
+            QMessageBox.warning(self, "Hata", "Kullanıcı adı veya şifre boş bırakılamaz.")
+            return
+
+        if username not in registered_users or registered_users[username] != password:
+            QMessageBox.warning(self, "Hata", "Geçersiz kullanıcı adı veya şifre.")
+            return
+
+        QMessageBox.information(self, "Giriş Başarılı", "Başarıyla giriş yaptınız!")
+        self.close()
+        self.main_window = MainWindow()
+        self.main_window.show()
+
+    def open_register_window(self):
+        self.register_window = RegisterWindow(self)
+        self.hide()
+        self.register_window.show()
+
+    def center_on_screen(self):
+        qr = self.frameGeometry()
+        cp = QApplication.desktop().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
+
+class RegisterWindow(QMainWindow):
+    def __init__(self, login_window):
+        super().__init__()
+        self.login_window = login_window
+        self.setWindowTitle("Kayıt Ol")
+        self.setGeometry(0, 0, 400, 320)
+        self.center_on_screen()
+        self.setFixedSize(400, 320)
+
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        layout = QVBoxLayout(central_widget)
+
+        self.username_input = QLineEdit()
+        self.username_input.setPlaceholderText("Kullanıcı Adı (4-16 karakter)")
+        self.username_input.setStyleSheet("color: white; background-color: #333333;")
+        layout.addWidget(self.username_input)
+
+        self.password_input = QLineEdit()
+        self.password_input.setPlaceholderText("Şifre (4-16 karakter)")
+        self.password_input.setEchoMode(QLineEdit.Password)
+        self.password_input.setStyleSheet("color: white; background-color: #333333;")
+        layout.addWidget(self.password_input)
+
+        self.password_repeat_input = QLineEdit()
+        self.password_repeat_input.setPlaceholderText("Şifre Tekrar (4-16 karakter)")
+        self.password_repeat_input.setEchoMode(QLineEdit.Password)
+        self.password_repeat_input.setStyleSheet("color: white; background-color: #333333;")
+        layout.addWidget(self.password_repeat_input)
+
+        self.birthdate_input = QLineEdit()
+        self.birthdate_input.setPlaceholderText("Doğum Tarihi (GG.AA.YYYY)")
+        self.birthdate_input.setStyleSheet("color: white; background-color: #333333;")
+        layout.addWidget(self.birthdate_input)
+
+        register_button = QPushButton("Kayıt Ol")
+        register_button.setStyleSheet("background-color: #CCCCCC; color: black;")
+        register_button.clicked.connect(self.register)
+        layout.addWidget(register_button)
+
+        back_button = QPushButton("Geri")
+        back_button.setStyleSheet("background-color: #CCCCCC; color: black;")
+        back_button.clicked.connect(self.go_to_login)
+        layout.addWidget(back_button)
+
+        # Arka plan rengini koyu gri yap
+        palette = QPalette()
+        palette.setColor(QPalette.Window, QColor(51, 51, 51))
+        self.setPalette(palette)
+
+    def register(self):
+        username = self.username_input.text().strip()
+        password = self.password_input.text().strip()
+        password_repeat = self.password_repeat_input.text().strip()
+        birthdate = self.birthdate_input.text().strip()
+
+        if not username or not password or not password_repeat or not birthdate:
+            QMessageBox.warning(self, "Hata", "Lütfen tüm alanları doldurun.")
+            return
+
+        if len(username) < 4 or len(username) > 16 or len(password) < 4 or len(password) > 16:
+            QMessageBox.warning(self, "Hata", "Kullanıcı adı veya şifre 4-16 karakter aralığında olmalıdır.")
+            return
+
+        if password != password_repeat:
+            QMessageBox.warning(self, "Hata", "Şifreler uyuşmuyor. Lütfen tekrar deneyin.")
+            self.password_input.clear()
+            self.password_repeat_input.clear()
+            return
+
+        registered_users[username] = password
+        QMessageBox.information(self, "Başarılı Kayıt", "Kayıt işlemi başarıyla tamamlandı!")
+        self.close()
+        self.login_window.show()
+
+    def go_to_login(self):
+        self.close()
+        self.login_window.show()
+
+    def center_on_screen(self):
+        qr = self.frameGeometry()
+        cp = QApplication.desktop().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    login_window = LoginWindow()
+    login_window.show()
+    sys.exit(app.exec_())
